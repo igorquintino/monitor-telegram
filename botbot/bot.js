@@ -17,15 +17,12 @@ const sitesPermitidos = [
     "amzn.to",
 ];
 
-// Defina o delay em milissegundos (ajustável)
-const DELAY_ENVIO = 30 * 1000; // Altere esse valor para modificar o tempo (ex: 5 * 60 * 1000 para 5 minutos)
-
 // Função para substituir links pelos links afiliados corretos
 const substituirLinkAfiliado = (texto) => {
     return texto
-        .replace(/https?:\/\/(www\.)?mercadolivre\.com[^\s]+/g, linkAfiliadoMercadoLivre)
-        .replace(/https?:\/\/(www\.)?divulgador\.magalu\.com[^\s]+/g, linkAfiliadoMagalu)
-        .replace(/https?:\/\/(www\.)?amzn\.to[^\s]+/g, linkAfiliadoAmazon);
+        .replace(/(https?:\/\/(www\.)?mercadolivre\.com[^\s]+)/g, linkAfiliadoMercadoLivre)
+        .replace(/(https?:\/\/(www\.)?divulgador\.magalu\.com[^\s]+)/g, linkAfiliadoMagalu)
+        .replace(/(https?:\/\/(www\.)?amzn\.to[^\s]+)/g, linkAfiliadoAmazon);
 };
 
 // Função para verificar se a mensagem contém links de sites permitidos
@@ -40,9 +37,13 @@ const formatarMensagem = (texto) => {
         return null;
     }
 
-    // Substitui os links pelos afiliados e retorna a mensagem formatada
+    // Substituir links por links de afiliado
     const textoModificado = substituirLinkAfiliado(texto);
-    return `🔥 Promoção Encontrada! 🔥\n\n${textoModificado}\n\n🔗 Compre aqui: ${textoModificado}`;
+    
+    // Extrair apenas o link final para o CTA (Chamada para ação)
+    const linkExtraido = textoModificado.match(/https?:\/\/[^\s]+/g)?.[0] || "";
+
+    return `🔥 Promoção Encontrada! 🔥\n\n${textoModificado}\n\n🔗 Compre aqui: ${linkExtraido}`;
 };
 
 // Função de delay
@@ -56,7 +57,7 @@ bot.on("message", async (ctx) => {
     // Verifica se a mensagem foi encaminhada e se veio do usuário autorizado
     if (mensagem.forward_date && chatId.toString() === usuarioAutorizado) {
         // Aguarda o tempo configurado antes de processar a próxima mensagem
-        await delay(DELAY_ENVIO);
+        await delay(30 * 1000); // Delay de 30 segundos (pode ser alterado)
 
         if (mensagem.photo) {
             const photo = mensagem.photo[mensagem.photo.length - 1].file_id;
