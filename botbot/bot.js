@@ -24,10 +24,10 @@ const DELAY_ENVIO = 30 * 1000; // Altere esse valor para modificar o tempo (ex: 
 // Função para substituir os links por afiliados
 const substituirLinkAfiliado = (texto) => {
     return texto
-        .replace(/https?:\/\/(www\.)?mercadolivre\.com[^\s]+/g, linkAfiliadoMercadoLivre)
-        .replace(/https?:\/\/(www\.)?divulgador\.magalu\.com[^\s]+/g, linkAfiliadoMagalu)
-        .replace(/https?:\/\/(www\.)?amzn\.to[^\s]+/g, (match) => `${match}?tag=${idAfiliadoAmazon}`)
-        .replace(/https?:\/\/(www\.)?amazon\.com\.br[^\s]+/g, (match) => `${match}?tag=${idAfiliadoAmazon}`);
+        .replace(/(?:https?:\/\/)?(www\.)?mercadolivre\.com[^\s]+/gi, linkAfiliadoMercadoLivre)
+        .replace(/(?:https?:\/\/)?(www\.)?divulgador\.magalu\.com[^\s]+/gi, linkAfiliadoMagalu)
+        .replace(/(?:https?:\/\/)?(www\.)?amzn\.to[^\s]+/gi, (match) => `https://${match}?tag=${idAfiliadoAmazon}`)
+        .replace(/(?:https?:\/\/)?(www\.)?amazon\.com\.br[^\s]+/gi, (match) => `https://${match}?tag=${idAfiliadoAmazon}`);
 };
 
 // Função para verificar se há links de sites permitidos
