@@ -20,7 +20,10 @@ const sitesPermitidos = [
     "magazinevoce.com.br"
 ];
 
-// Padroniza URLs para garantir que sempre comecem com "https://"
+// Expressão regular para identificar links corretamente
+const regexUrl = /(https?:\/\/[^\s]+)/g;
+
+// Padroniza URLs garantindo que sempre comecem com "https://"
 const padronizarUrl = (url) => {
     if (!url.startsWith("http")) {
         return `https://${url}`;
@@ -28,15 +31,15 @@ const padronizarUrl = (url) => {
     return url;
 };
 
-// Expande URLs encurtadas (Magalu, Amazon e outras)
+// Expande URLs encurtadas (Amazon, Magalu, etc.)
 const expandirUrl = async (url) => {
     try {
         const urlFormatada = padronizarUrl(url);
         const response = await axios.get(urlFormatada, { maxRedirects: 5 });
         return response.request.res.responseUrl || urlFormatada;
     } catch (error) {
-        console.error(`❌ Erro ao expandir URL: ${url}`, error.message);
-        return url;
+        console.error(`❌ Erro ao expandir URL: ${url} - Motivo: ${error.message}`);
+        return url; // Retorna o original se não conseguir expandir
     }
 };
 
@@ -59,7 +62,7 @@ const possuiAfiliado = (url) => {
 
 // Substitui os links pelos afiliados corretos
 const substituirLinkAfiliado = async (texto) => {
-    const urlsEncontradas = texto.match(/(?:https?:\/\/)?(?:www\.)?[^\s]+/g) || [];
+    const urlsEncontradas = texto.match(regexUrl) || [];
 
     for (let url of urlsEncontradas) {
         let urlExpandida = await expandirUrl(url);
