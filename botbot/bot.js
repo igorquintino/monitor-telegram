@@ -6,29 +6,36 @@ dotenv.config();
 const bot = new Telegraf(process.env.BOT_TOKEN);
 const usuarioAutorizado = process.env.USUARIO_AUTORIZADO;
 const grupoDestino = process.env.GRUPO_DESTINO;
-const linkAfiliado = process.env.LINK_AFILIADO;
 
 // Defina o delay em milissegundos (30 segundos para testes)
-const DELAY_ENVIO = 30 * 1000; // Altere esse valor para mudar o delay (ex: 5 * 60 * 1000 para 5 minutos)
+const DELAY_ENVIO = 30 * 1000; // Altere esse valor para mudar o delay
 
-// Função para transformar links para links de afiliado
+// Função para substituir links pelos links de afiliado corretos
 const transformarLinks = (texto) => {
-    return texto.replace(/(https?:\/\/[^\s]+)/g, (match) => {
-        if (match.includes("mercadolivre.com")) {
-            return `🔗 Compre no Mercado Livre: ${match}?mkt_source=SEU_AFILIADO`;
-        } else if (match.includes("amazon.com") || match.includes("amzn.to")) {
-            return `🔗 Compre na Amazon: ${match}?tag=SEU_ID_AFILIADO-20`;
-        } else if (match.includes("magazineluiza.com") || match.includes("magalu.com")) {
-            return `🔗 Compre na Magalu: ${match}?partner_id=SEU_ID_AFILIADO`;
+    let novoTexto = texto;
+
+    const regexLinks = /(https?:\/\/[^\s]+)/g;
+    const linksEncontrados = texto.match(regexLinks) || [];
+
+    linksEncontrados.forEach((link) => {
+        if (link.includes("mercadolivre.com")) {
+            novoTexto = novoTexto.replace(link, `🔗 [Compre no Mercado Livre](https://mercadolivre.com/sec/1KhDTbE?mkt_source=SEU_AFILIADO)`);
+        } else if (link.includes("amazon.com") || link.includes("amzn.to")) {
+            novoTexto = novoTexto.replace(link, `🔗 [Compre na Amazon](https://www.amazon.com.br/dp/B08L5M9BTJ?tag=SEU_ID_AFILIADO-20)`);
+        } else if (link.includes("magazineluiza.com") || link.includes("magalu.com")) {
+            novoTexto = novoTexto.replace(link, `🔗 [Compre na Magalu](https://www.magazineluiza.com.br/SEU_ID_AFILIADO)`);
+        } else {
+            novoTexto = novoTexto.replace(link, ""); // Remove links não reconhecidos
         }
-        return ""; // Remove links que não sejam de lojas suportadas
     });
+
+    return novoTexto.trim();
 };
 
-// Função para formatar a mensagem final
+// Função para formatar a mensagem corretamente
 const formatarMensagem = (texto) => {
-    const textoComLinksCorrigidos = transformarLinks(texto);
-    return `🔥 Promoção Encontrada! 🔥\n\n${textoComLinksCorrigidos}\n\n🔗 Compre aqui: ${linkAfiliado}`;
+    const textoCorrigido = transformarLinks(texto);
+    return `🔥 Promoção Encontrada! 🔥\n\n${textoCorrigido}`;
 };
 
 // Função para delay
@@ -48,11 +55,11 @@ bot.on("message", async (ctx) => {
             const photo = mensagem.photo[mensagem.photo.length - 1].file_id;
             const legendaFormatada = formatarMensagem(mensagem.caption || "");
 
-            await bot.telegram.sendPhoto(grupoDestino, photo, { caption: legendaFormatada });
+            await bot.telegram.sendPhoto(grupoDestino, photo, { caption: legendaFormatada, parse_mode: "Markdown" });
             console.log(`✅ Imagem repassada com legenda: ${legendaFormatada}`);
         } else if (mensagem.text) {
             const mensagemFormatada = formatarMensagem(mensagem.text);
-            await bot.telegram.sendMessage(grupoDestino, mensagemFormatada);
+            await bot.telegram.sendMessage(grupoDestino, mensagemFormatada, { parse_mode: "Markdown" });
             console.log(`✅ Mensagem repassada: ${mensagemFormatada}`);
         }
     }
