@@ -1,6 +1,6 @@
 import { Telegraf } from "telegraf";
 import dotenv from "dotenv";
-import axios from "axios";
+import axios from "axios"; // Importamos o axios para expandir URLs
 
 dotenv.config();
 
@@ -9,7 +9,7 @@ const usuarioAutorizado = process.env.USUARIO_AUTORIZADO;
 const grupoDestino = process.env.GRUPO_DESTINO;
 const idAfiliadoAmazon = process.env.ID_AFILIADO_AMAZON;
 const linkAfiliadoMercadoLivre = process.env.LINK_AFILIADO_MERCADOLIVRE;
-const idAfiliadoMagalu = process.env.ID_AFILIADO_MAGALU;
+const linkAfiliadoMagalu = process.env.LINK_AFILIADO_MAGALU;
 
 // Lista de domínios permitidos
 const sitesPermitidos = [
@@ -20,86 +20,64 @@ const sitesPermitidos = [
 ];
 
 // Defina o delay em milissegundos (ajustável)
-const DELAY_ENVIO = 30 * 1000;
+const DELAY_ENVIO = 30 * 1000; // Altere esse valor para modificar o tempo (ex: 5 * 60 * 1000 para 5 minutos)
 
-// 📌 Expansão de links encurtados da Magalu
-const obterUrlReal = async (urlEncurtada) => {
+// Função para expandir URLs encurtadas
+const expandirUrl = async (url) => {
     try {
-        const response = await axios.get(urlEncurtada, { maxRedirects: 5 });
-        return response.request.res.responseUrl;
+        const response = await axios.head(url, { maxRedirects: 5 });
+        return response.request.res.responseUrl || url;
     } catch (error) {
-        console.error("❌ Erro ao expandir link:", error);
-        return null;
+        console.error(`❌ Erro ao expandir URL: ${url}`, error.message);
+        return url;
     }
 };
 
-// 📌 Extrair ID do produto da Magalu
-const extrairIdProdutoMagalu = (urlReal) => {
-    const regex = /\/p\/(\d+)\//;
-    const match = urlReal.match(regex);
-    return match ? match[1] : null;
-};
-
-// 📌 Gerar link de afiliado da Magalu
-const gerarLinkAfiliadoMagalu = (idProduto) => {
-    return `https://divulgador.magalu.com/${idAfiliadoMagalu}?utm_source=telegram&utm_campaign=promo_${idProduto}`;
-};
-
-// 📌 Substituir links pelos afiliados
+// Função para substituir os links por afiliados
 const substituirLinkAfiliado = async (texto) => {
-    let novoTexto = texto;
+    const urlsEncontradas = texto.match(/https?:\/\/[^\s]+/g) || [];
 
-    // Substituir Mercado Livre
-    novoTexto = novoTexto.replace(/(?:https?:\/\/)?(www\.)?mercadolivre\.com[^\s]+/gi, linkAfiliadoMercadoLivre);
+    for (let url of urlsEncontradas) {
+        const urlExpandida = await expandirUrl(url);
 
-    // Substituir Amazon
-    novoTexto = novoTexto.replace(/(?:https?:\/\/)?(www\.)?amzn\.to[^\s]+/gi, (match) => `https://${match}?tag=${idAfiliadoAmazon}`);
-    novoTexto = novoTexto.replace(/(?:https?:\/\/)?(www\.)?amazon\.com\.br[^\s]+/gi, (match) => `https://${match}?tag=${idAfiliadoAmazon}`);
-
-    // Detectar e converter links da Magalu
-    const regexMagalu = /(https?:\/\/divulgador\.magalu\.com\/[^\s]+)/g;
-    const linksMagalu = novoTexto.match(regexMagalu);
-
-    if (linksMagalu) {
-        for (let link of linksMagalu) {
-            const urlReal = await obterUrlReal(link);
-            if (urlReal) {
-                const idProduto = extrairIdProdutoMagalu(urlReal);
-                if (idProduto) {
-                    const novoLink = gerarLinkAfiliadoMagalu(idProduto);
-                    novoTexto = novoTexto.replace(link, novoLink);
-                }
-            }
+        if (urlExpandida.includes("mercadolivre.com")) {
+            texto = texto.replace(url, linkAfiliadoMercadoLivre);
+        } else if (urlExpandida.includes("divulgador.magalu.com")) {
+            texto = texto.replace(url, linkAfiliadoMagalu);
+        } else if (urlExpandida.includes("amazon.com.br") || urlExpandida.includes("amzn.to")) {
+            texto = texto.replace(url, `${urlExpandida}?tag=${idAfiliadoAmazon}`);
         }
     }
 
-    return novoTexto;
+    return texto;
 };
 
-// 📌 Verificar se há links de sites permitidos
+// Função para verificar se há links de sites permitidos
 const contemLinkPermitido = (texto) => {
     return sitesPermitidos.some(site => texto.includes(site));
 };
 
-// 📌 Formatar a mensagem final
+// Função para formatar a mensagem antes de enviá-la
 const formatarMensagem = async (texto) => {
     if (!contemLinkPermitido(texto)) {
         console.log("🚫 Mensagem ignorada: contém links de sites não permitidos.");
         return null;
     }
 
+    // Substituir links pelos links afiliados corretos
     const textoModificado = await substituirLinkAfiliado(texto);
     return `🔥 Promoção Encontrada! 🔥\n\n${textoModificado}`;
 };
 
-// 📌 Função de delay
+// Função de delay
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// 📌 Escuta mensagens encaminhadas
+// Escuta mensagens encaminhadas
 bot.on("message", async (ctx) => {
     const chatId = ctx.chat.id;
     const mensagem = ctx.message;
 
+    // Verifica se a mensagem foi encaminhada e veio do usuário autorizado
     if (mensagem.forward_date && chatId.toString() === usuarioAutorizado) {
         await delay(DELAY_ENVIO);
 
@@ -121,11 +99,11 @@ bot.on("message", async (ctx) => {
     }
 });
 
-// 📌 Inicia o bot
+// Inicia o bot
 bot.launch().then(() => {
     console.log("🤖 Bot do Telegram iniciado!");
 });
 
-// 📌 Tratamento de erros
+// Tratamento de erros
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
