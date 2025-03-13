@@ -8,13 +8,14 @@ const bot = new Telegraf(process.env.BOT_TOKEN);
 const usuarioAutorizado = process.env.USUARIO_AUTORIZADO;
 const grupoDestino = process.env.GRUPO_DESTINO;
 const idAfiliadoAmazon = process.env.ID_AFILIADO_AMAZON;
-const linkAfiliadoMercadoLivre = process.env.LINK_AFILIADO_MERCADOLIVRE;
 const idAfiliadoMagalu = process.env.ID_AFILIADO_MAGALU;
+const linkAfiliadoMercadoLivre = process.env.LINK_AFILIADO_MERCADOLIVRE;
 
 // Lista de domínios permitidos
 const sitesPermitidos = [
     "mercadolivre.com",
     "divulgador.magalu.com",
+    "magazinevoce.com.br",
     "amazon.com.br",
     "amzn.to"
 ];
@@ -59,7 +60,7 @@ const tratarLinkMagalu = async (url) => {
     return urlTratada;
 };
 
-// Função para substituir os links por afiliados corretos
+// Função para substituir links por afiliados corretos
 const substituirLinkAfiliado = async (texto) => {
     const urlsEncontradas = texto.match(/\b(?:https?:\/\/)?(?:www\.)?[\w.-]+\.\w{2,}(?:\/[^\s]*)?/g) || [];
 
@@ -68,7 +69,7 @@ const substituirLinkAfiliado = async (texto) => {
 
         if (urlExpandida.includes("mercadolivre.com")) {
             texto = texto.replace(url, linkAfiliadoMercadoLivre);
-        } else if (urlExpandida.includes("divulgador.magalu.com")) {
+        } else if (urlExpandida.includes("divulgador.magalu.com") || urlExpandida.includes("magazinevoce.com.br")) {
             const urlMagalu = await tratarLinkMagalu(urlExpandida);
             texto = texto.replace(url, urlMagalu);
         } else if (urlExpandida.includes("amazon.com.br") || urlExpandida.includes("amzn.to")) {
@@ -94,7 +95,7 @@ const formatarMensagem = async (texto) => {
 
     // Substituir links pelos links afiliados corretos
     const textoModificado = await substituirLinkAfiliado(texto);
-    return `🔥 Promoção Relâmpago! 🔥\n\n🛒 *Produto:* ${textoModificado}\n\n⚡ *Aproveite antes que acabe!*`;
+    return `🔥 *Promoção Relâmpago!* 🔥\n\n🛒 *Produto:* ${textoModificado}\n\n⚡ *Aproveite antes que acabe!*`;
 };
 
 // Função de delay
