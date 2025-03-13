@@ -8,15 +8,16 @@ const bot = new Telegraf(process.env.BOT_TOKEN);
 const usuarioAutorizado = process.env.USUARIO_AUTORIZADO;
 const grupoDestino = process.env.GRUPO_DESTINO;
 const idAfiliadoAmazon = process.env.ID_AFILIADO_AMAZON;
-const idAfiliadoMagalu = process.env.ID_AFILIADO_MAGALU;
 const idAfiliadoMercadoLivre = process.env.ID_AFILIADO_MERCADOLIVRE;
+const idAfiliadoMagalu = process.env.ID_AFILIADO_MAGALU; // Aqui será seu Magazine Você ID
 
 // Lista de domínios permitidos
 const sitesPermitidos = [
     "mercadolivre.com",
     "amazon.com.br",
     "amzn.to",
-    "divulgador.magalu.com"
+    "divulgador.magalu.com",
+    "magazinevoce.com.br"
 ];
 
 // Defina o delay em milissegundos (ajustável)
@@ -31,6 +32,23 @@ const expandirUrl = async (url) => {
         console.error(`❌ Erro ao expandir URL: ${url}`, error.message);
         return url;
     }
+};
+
+// Função para converter links encurtados do Divulgador Magalu para o Magazine Você
+const converterLinkMagalu = async (url) => {
+    const urlExpandida = await expandirUrl(url);
+    
+    if (urlExpandida.includes("divulgador.magalu.com")) {
+        console.log(`🔄 Link Magalu expandido: ${urlExpandida}`);
+        
+        // Pega o código do produto no final do link
+        const codigoProduto = urlExpandida.split("/").pop();
+
+        // Monta a URL completa para o Magazine Você com seu ID correto
+        return `https://www.magazinevoce.com.br/${idAfiliadoMagalu}/p/${codigoProduto}`;
+    }
+
+    return urlExpandida;
 };
 
 // Função para verificar se a URL já possui um ID de afiliado
@@ -49,8 +67,8 @@ const substituirLinkAfiliado = async (texto) => {
             urlExpandida += `?afsrc=${idAfiliadoMercadoLivre}`;
         } else if ((urlExpandida.includes("amazon.com.br") || urlExpandida.includes("amzn.to")) && !possuiAfiliado(urlExpandida)) {
             urlExpandida += `?tag=${idAfiliadoAmazon}`;
-        } else if (urlExpandida.includes("divulgador.magalu.com") && !possuiAfiliado(urlExpandida)) {
-            urlExpandida += `?id=${idAfiliadoMagalu}`;
+        } else if (urlExpandida.includes("divulgador.magalu.com")) {
+            urlExpandida = await converterLinkMagalu(urlExpandida);
         }
 
         texto = texto.replace(url, urlExpandida);
