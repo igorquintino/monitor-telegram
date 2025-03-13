@@ -16,7 +16,8 @@ const idAfiliadoAmazon = process.env.ID_AFILIADO_AMAZON;
 const linksAfiliados = [
     { domain: "mercadolivre.com", param: "?mkt_source=" + idAfiliadoMercadoLivre },
     { domain: "divulgador.magalu.com", param: "?partner_id=" + idAfiliadoMagalu },
-    { domain: "amazon.com", param: "?tag=" + idAfiliadoAmazon }
+    { domain: "amazon.com.br", param: "?tag=" + idAfiliadoAmazon },
+    { domain: "amzn.to", param: "?tag=" + idAfiliadoAmazon }
 ];
 
 // Defina o delay em milissegundos
@@ -41,7 +42,8 @@ const formatarMensagem = (texto) => {
     
     if (!mensagemModificada.includes("mercadolivre.com") &&
         !mensagemModificada.includes("divulgador.magalu.com") &&
-        !mensagemModificada.includes("amazon.com")) {
+        !mensagemModificada.includes("amazon.com") &&
+        !mensagemModificada.includes("amzn.to")) {
         console.log("🚫 Mensagem ignorada: contém links de sites não permitidos.");
         return null;
     }
