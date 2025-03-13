@@ -7,36 +7,37 @@ const bot = new Telegraf(process.env.BOT_TOKEN);
 const usuarioAutorizado = process.env.USUARIO_AUTORIZADO;
 const grupoDestino = process.env.GRUPO_DESTINO;
 
-// Defina o delay em milissegundos (30 segundos para testes)
-const DELAY_ENVIO = 30 * 1000;
-
-// Função para transformar os links nos links de afiliado corretos
-const transformarLinks = (texto) => {
-    let novoTexto = texto;
-
-    const regexLinks = /(https?:\/\/[^\s]+)/g;
-    const linksEncontrados = texto.match(regexLinks) || [];
-
-    linksEncontrados.forEach((link) => {
-        if (link.includes("mercadolivre.com")) {
-            novoTexto = novoTexto.replace(link, `🔗 [🛍️ Compre no Mercado Livre](https://mercadolivre.com/sec/1KhDTbE?mkt_source=SEU_AFILIADO)`);
-        } else if (link.includes("amazon.com") || link.includes("amzn.to")) {
-            novoTexto = novoTexto.replace(link, `🔗 [🛒 Compre na Amazon](https://www.amazon.com.br/dp/B08L5M9BTJ?tag=SEU_ID_AFILIADO-20)`);
-        } else if (link.includes("magazineluiza.com") || link.includes("magalu.com")) {
-            novoTexto = novoTexto.replace(link, `🔗 [🛍️ Compre na Magalu](https://www.magazineluiza.com.br/SEU_ID_AFILIADO)`);
-        } else {
-            novoTexto = novoTexto.replace(link, ""); // Remove links não reconhecidos
-        }
-    });
-
-    return novoTexto.trim();
+// Links de afiliado para cada site
+const LINKS_AFILIADOS = {
+    "mercadolivre.com": "SEU_LINK_AFILIADO_MERCADOLIVRE",
+    "magazineluiza.com": "SEU_LINK_AFILIADO_MAGALU",
+    "amazon.com.br": "SEU_LINK_AFILIADO_AMAZON"
 };
 
-// Função para formatar a mensagem corretamente
-const formatarMensagem = (texto) => {
-    const textoCorrigido = transformarLinks(texto);
+// Defina o delay em milissegundos (30 segundos para testes)
+const DELAY_ENVIO = 30 * 1000; // Altere esse valor para mudar o delay
 
-    return `🛒 **OFERTA IMPERDÍVEL!** 🎯\n\n${textoCorrigido}\n\n🚀 **Estoque limitado! Aproveite antes que acabe!**`;
+// Função para extrair e substituir links de afiliado
+const substituirLinksAfiliados = (texto) => {
+    let mensagemFormatada = texto;
+    let encontrouLinkPermitido = false;
+
+    mensagemFormatada = mensagemFormatada.replace(/(https?:\/\/[^\s]+)/g, (match) => {
+        try {
+            const url = new URL(match);
+            const dominio = url.hostname.replace("www.", "");
+
+            if (LINKS_AFILIADOS[dominio]) {
+                encontrouLinkPermitido = true;
+                return `🔗 Compre aqui: ${LINKS_AFILIADOS[dominio]}`;
+            }
+        } catch (error) {
+            return "";
+        }
+        return "";
+    });
+
+    return encontrouLinkPermitido ? mensagemFormatada.trim() : null;
 };
 
 // Função para delay
@@ -49,18 +50,26 @@ bot.on("message", async (ctx) => {
 
     // Verifica se a mensagem foi encaminhada e se veio do usuário autorizado
     if (mensagem.forward_date && chatId.toString() === usuarioAutorizado) {
+        let mensagemTexto = mensagem.text || (mensagem.caption ? mensagem.caption : "");
+
+        // Substitui os links de afiliado e verifica se há links permitidos
+        const mensagemFormatada = substituirLinksAfiliados(mensagemTexto);
+
+        // Se a mensagem não contiver links permitidos, ignora
+        if (!mensagemFormatada) {
+            console.log("🚫 Mensagem ignorada: contém links de sites não permitidos.");
+            return;
+        }
+
         // Aguarda o tempo configurado antes de processar a próxima mensagem
         await delay(DELAY_ENVIO);
 
         if (mensagem.photo) {
             const photo = mensagem.photo[mensagem.photo.length - 1].file_id;
-            const legendaFormatada = formatarMensagem(mensagem.caption || "");
-
-            await bot.telegram.sendPhoto(grupoDestino, photo, { caption: legendaFormatada, parse_mode: "Markdown" });
-            console.log(`✅ Imagem repassada com legenda: ${legendaFormatada}`);
-        } else if (mensagem.text) {
-            const mensagemFormatada = formatarMensagem(mensagem.text);
-            await bot.telegram.sendMessage(grupoDestino, mensagemFormatada, { parse_mode: "Markdown" });
+            await bot.telegram.sendPhoto(grupoDestino, photo, { caption: mensagemFormatada });
+            console.log(`✅ Imagem repassada com legenda: ${mensagemFormatada}`);
+        } else {
+            await bot.telegram.sendMessage(grupoDestino, mensagemFormatada);
             console.log(`✅ Mensagem repassada: ${mensagemFormatada}`);
         }
     }
