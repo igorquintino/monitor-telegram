@@ -6,44 +6,47 @@ dotenv.config();
 const bot = new Telegraf(process.env.BOT_TOKEN);
 const usuarioAutorizado = process.env.USUARIO_AUTORIZADO;
 const grupoDestino = process.env.GRUPO_DESTINO;
-const linkAfiliadoMercadoLivre = process.env.LINK_AFILIADO_MERCADOLIVRE;
-const linkAfiliadoMagalu = process.env.LINK_AFILIADO_MAGALU;
-const linkAfiliadoAmazon = process.env.LINK_AFILIADO_AMAZON;
 
-// Lista de domínios permitidos
-const sitesPermitidos = [
-    "mercadolivre.com",
-    "divulgador.magalu.com",
-    "amzn.to",
+// IDs de afiliado
+const idAfiliadoMercadoLivre = process.env.ID_AFILIADO_MERCADOLIVRE;
+const idAfiliadoMagalu = process.env.ID_AFILIADO_MAGALU;
+const idAfiliadoAmazon = process.env.ID_AFILIADO_AMAZON;
+
+// Lista de domínios permitidos e como modificar os links
+const linksAfiliados = [
+    { domain: "mercadolivre.com", param: "?mkt_source=" + idAfiliadoMercadoLivre },
+    { domain: "divulgador.magalu.com", param: "?partner_id=" + idAfiliadoMagalu },
+    { domain: "amazon.com", param: "?tag=" + idAfiliadoAmazon }
 ];
 
-// Função para substituir links pelos links afiliados corretos
-const substituirLinkAfiliado = (texto) => {
-    return texto
-        .replace(/(https?:\/\/(www\.)?mercadolivre\.com[^\s]+)/g, linkAfiliadoMercadoLivre)
-        .replace(/(https?:\/\/(www\.)?divulgador\.magalu\.com[^\s]+)/g, linkAfiliadoMagalu)
-        .replace(/(https?:\/\/(www\.)?amzn\.to[^\s]+)/g, linkAfiliadoAmazon);
-};
+// Defina o delay em milissegundos
+const DELAY_ENVIO = 30 * 1000; 
 
-// Função para verificar se a mensagem contém links de sites permitidos
-const contemLinkPermitido = (texto) => {
-    return sitesPermitidos.some(site => texto.includes(site));
+// Função para modificar os links da mensagem e adicionar o ID de afiliado
+const modificarLinksAfiliados = (texto) => {
+    return texto.replace(/https?:\/\/[^\s]+/g, (match) => {
+        for (let site of linksAfiliados) {
+            if (match.includes(site.domain)) {
+                // Se o link já contém parâmetros, adiciona um "&", senão, usa "?"
+                return match.includes("?") ? `${match}&${site.param}` : `${match}${site.param}`;
+            }
+        }
+        return match; // Se não for um link permitido, mantém como está
+    });
 };
 
 // Função para formatar a mensagem final
 const formatarMensagem = (texto) => {
-    if (!contemLinkPermitido(texto)) {
+    const mensagemModificada = modificarLinksAfiliados(texto);
+    
+    if (!mensagemModificada.includes("mercadolivre.com") &&
+        !mensagemModificada.includes("divulgador.magalu.com") &&
+        !mensagemModificada.includes("amazon.com")) {
         console.log("🚫 Mensagem ignorada: contém links de sites não permitidos.");
         return null;
     }
 
-    // Substituir links por links de afiliado
-    const textoModificado = substituirLinkAfiliado(texto);
-    
-    // Extrair apenas o link final para o CTA (Chamada para ação)
-    const linkExtraido = textoModificado.match(/https?:\/\/[^\s]+/g)?.[0] || "";
-
-    return `🔥 Promoção Encontrada! 🔥\n\n${textoModificado}\n\n🔗 Compre aqui: ${linkExtraido}`;
+    return `🔥 Promoção Encontrada! 🔥\n\n${mensagemModificada}`;
 };
 
 // Função de delay
@@ -54,10 +57,8 @@ bot.on("message", async (ctx) => {
     const chatId = ctx.chat.id;
     const mensagem = ctx.message;
 
-    // Verifica se a mensagem foi encaminhada e se veio do usuário autorizado
     if (mensagem.forward_date && chatId.toString() === usuarioAutorizado) {
-        // Aguarda o tempo configurado antes de processar a próxima mensagem
-        await delay(30 * 1000); // Delay de 30 segundos (pode ser alterado)
+        await delay(DELAY_ENVIO);
 
         if (mensagem.photo) {
             const photo = mensagem.photo[mensagem.photo.length - 1].file_id;
