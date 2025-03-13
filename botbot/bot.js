@@ -20,11 +20,20 @@ const sitesPermitidos = [
     "magazinevoce.com.br"
 ];
 
+// Função para padronizar URLs (garantindo que sempre tenham "https://")
+const padronizarUrl = (url) => {
+    if (!url.startsWith("http")) {
+        return `https://${url}`;
+    }
+    return url;
+};
+
 // Função para expandir URLs encurtadas
 const expandirUrl = async (url) => {
     try {
-        const response = await axios.get(url, { maxRedirects: 5 });
-        return response.request.res.responseUrl || url;
+        const urlFormatada = padronizarUrl(url);
+        const response = await axios.get(urlFormatada, { maxRedirects: 5 });
+        return response.request.res.responseUrl || urlFormatada;
     } catch (error) {
         console.error(`❌ Erro ao expandir URL: ${url}`, error.message);
         return url;
@@ -52,7 +61,7 @@ const possuiAfiliado = (url) => {
 
 // Função para substituir os links por afiliados
 const substituirLinkAfiliado = async (texto) => {
-    const urlsEncontradas = texto.match(/https?:\/\/[^\s]+/g) || [];
+    const urlsEncontradas = texto.match(/(?:https?:\/\/)?(?:www\.)?[^\s]+/g) || [];
 
     for (let url of urlsEncontradas) {
         let urlExpandida = await expandirUrl(url);
