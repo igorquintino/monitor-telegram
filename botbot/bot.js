@@ -9,6 +9,7 @@ const grupoDestino = process.env.GRUPO_DESTINO;
 const linkAfiliado = process.env.LINK_AFILIADO;
 
 const filaMensagens = []; // Fila para armazenar mensagens a serem enviadas
+let processandoFila = false; // Controle para evitar múltiplos processamentos
 
 // Função para formatar a mensagem com o link de afiliado
 const formatarMensagem = (texto) => {
@@ -17,20 +18,28 @@ const formatarMensagem = (texto) => {
 
 // Função para processar a fila de mensagens com delay de 5 minutos
 const processarFila = async () => {
-    if (filaMensagens.length > 0) {
-        const { tipo, conteudo } = filaMensagens.shift();
+    if (filaMensagens.length === 0) {
+        processandoFila = false; // Para de processar quando não há mais mensagens
+        return;
+    }
 
+    processandoFila = true; // Marca como em processamento
+    const { tipo, conteudo, legenda } = filaMensagens.shift();
+
+    try {
         if (tipo === "texto") {
             await bot.telegram.sendMessage(grupoDestino, conteudo);
         } else if (tipo === "imagem") {
-            await bot.telegram.sendPhoto(grupoDestino, conteudo);
+            await bot.telegram.sendPhoto(grupoDestino, conteudo, { caption: legenda });
         }
 
         console.log(`✅ Mensagem enviada: ${conteudo}`);
-        
-        // Aguarda 5 minutos antes de processar a próxima mensagem
-        setTimeout(processarFila, 5 * 60 * 1000);
+    } catch (error) {
+        console.error("❌ Erro ao enviar mensagem:", error);
     }
+
+    // Aguarda 5 minutos antes de processar a próxima mensagem
+    setTimeout(processarFila, 5 * 60 * 1000);
 };
 
 // Escuta mensagens encaminhadas
@@ -46,13 +55,14 @@ bot.on("message", async (ctx) => {
         } else if (mensagem.photo) {
             // Obtém a melhor qualidade da imagem enviada
             const photo = mensagem.photo[mensagem.photo.length - 1].file_id;
-            filaMensagens.push({ tipo: "imagem", conteudo: photo });
+            const legenda = mensagem.caption ? formatarMensagem(mensagem.caption) : null;
+            filaMensagens.push({ tipo: "imagem", conteudo: photo, legenda });
         }
 
         console.log("✅ Mensagem adicionada à fila.");
 
-        // Se for a primeira mensagem da fila, inicia o processamento
-        if (filaMensagens.length === 1) {
+        // Se a fila não estiver sendo processada, inicia o processamento
+        if (!processandoFila) {
             processarFila();
         }
     }
