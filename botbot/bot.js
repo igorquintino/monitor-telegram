@@ -20,12 +20,12 @@ const sitesPermitidos = [
     "magazinevoce.com.br"
 ];
 
-// Expressão regular para identificar links corretamente
-const regexUrl = /(https?:\/\/[^\s]+)/g;
+// Expressão regular para identificar links corretamente (incluindo links sem "http" ou "www")
+const regexUrl = /(?:https?:\/\/|www\.)?[a-zA-Z0-9.-]+\.(com|br|net|org|io|shop)[^\s]*/gi;
 
 // Padroniza URLs garantindo que sempre comecem com "https://"
 const padronizarUrl = (url) => {
-    if (!url.startsWith("http")) {
+    if (!url.startsWith("http") && url.includes(".com")) {
         return `https://${url}`;
     }
     return url;
