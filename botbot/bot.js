@@ -1,6 +1,6 @@
 import { Telegraf } from "telegraf";
 import dotenv from "dotenv";
-import axios from "axios"; // Importamos axios para expandir URLs
+import axios from "axios"; // Para expandir URLs encurtadas
 
 dotenv.config();
 
@@ -9,7 +9,7 @@ const usuarioAutorizado = process.env.USUARIO_AUTORIZADO;
 const grupoDestino = process.env.GRUPO_DESTINO;
 const idAfiliadoAmazon = process.env.ID_AFILIADO_AMAZON;
 const linkAfiliadoMercadoLivre = process.env.LINK_AFILIADO_MERCADOLIVRE;
-const linkAfiliadoMagalu = process.env.LINK_AFILIADO_MAGALU;
+const idAfiliadoMagalu = process.env.ID_AFILIADO_MAGALU;
 
 // Lista de domínios permitidos
 const sitesPermitidos = [
@@ -39,9 +39,21 @@ const tratarLinkAmazon = async (url) => {
         urlTratada = await expandirUrl(url);
     }
 
-    // Se for Amazon.com.br, adicionamos o ID de afiliado
+    // Se for Amazon.com.br, adicionamos o ID de afiliado, se ainda não tiver
     if (urlTratada.includes("amazon.com.br") && !urlTratada.includes("?tag=")) {
         urlTratada += `?tag=${idAfiliadoAmazon}`;
+    }
+
+    return urlTratada;
+};
+
+// Função para tratar links da Magazine Luiza
+const tratarLinkMagalu = async (url) => {
+    let urlTratada = await expandirUrl(url);
+
+    // Substituir o nome do vendedor pelo correto
+    if (urlTratada.includes("magazinevoce.com.br")) {
+        urlTratada = urlTratada.replace(/magazinevoce\.com\.br\/[^\/]+/, `magazinevoce.com.br/${idAfiliadoMagalu}`);
     }
 
     return urlTratada;
@@ -57,7 +69,8 @@ const substituirLinkAfiliado = async (texto) => {
         if (urlExpandida.includes("mercadolivre.com")) {
             texto = texto.replace(url, linkAfiliadoMercadoLivre);
         } else if (urlExpandida.includes("divulgador.magalu.com")) {
-            texto = texto.replace(url, linkAfiliadoMagalu);
+            const urlMagalu = await tratarLinkMagalu(urlExpandida);
+            texto = texto.replace(url, urlMagalu);
         } else if (urlExpandida.includes("amazon.com.br") || urlExpandida.includes("amzn.to")) {
             const urlAmazon = await tratarLinkAmazon(urlExpandida);
             texto = texto.replace(url, urlAmazon);
@@ -81,7 +94,7 @@ const formatarMensagem = async (texto) => {
 
     // Substituir links pelos links afiliados corretos
     const textoModificado = await substituirLinkAfiliado(texto);
-    return `🔥 Promoção Relâmpago! 🔥\n\n${textoModificado}\n\n⚡ Aproveite antes que acabe!`;
+    return `🔥 Promoção Relâmpago! 🔥\n\n🛒 *Produto:* ${textoModificado}\n\n⚡ *Aproveite antes que acabe!*`;
 };
 
 // Função de delay
@@ -101,13 +114,13 @@ bot.on("message", async (ctx) => {
             const legendaFormatada = await formatarMensagem(mensagem.caption || "");
 
             if (legendaFormatada) {
-                await bot.telegram.sendPhoto(grupoDestino, photo, { caption: legendaFormatada });
+                await bot.telegram.sendPhoto(grupoDestino, photo, { caption: legendaFormatada, parse_mode: "Markdown" });
                 console.log(`✅ Imagem repassada com legenda: ${legendaFormatada}`);
             }
         } else if (mensagem.text) {
             const mensagemFormatada = await formatarMensagem(mensagem.text);
             if (mensagemFormatada) {
-                await bot.telegram.sendMessage(grupoDestino, mensagemFormatada);
+                await bot.telegram.sendMessage(grupoDestino, mensagemFormatada, { parse_mode: "Markdown" });
                 console.log(`✅ Mensagem repassada: ${mensagemFormatada}`);
             }
         }
