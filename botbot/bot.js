@@ -9,7 +9,7 @@ const usuarioAutorizado = process.env.USUARIO_AUTORIZADO;
 const grupoDestino = process.env.GRUPO_DESTINO;
 const idAfiliadoAmazon = process.env.ID_AFILIADO_AMAZON;
 const idAfiliadoMercadoLivre = process.env.ID_AFILIADO_MERCADOLIVRE;
-const idAfiliadoMagalu = process.env.ID_AFILIADO_MAGALU; // Aqui será seu Magazine Você ID
+const idAfiliadoMagalu = process.env.ID_AFILIADO_MAGALU; // ID do seu Magazine Você
 
 // Lista de domínios permitidos
 const sitesPermitidos = [
@@ -20,13 +20,10 @@ const sitesPermitidos = [
     "magazinevoce.com.br"
 ];
 
-// Defina o delay em milissegundos (ajustável)
-const DELAY_ENVIO = 30 * 1000; // Modifique este valor para ajustar o tempo de espera
-
 // Função para expandir URLs encurtadas
 const expandirUrl = async (url) => {
     try {
-        const response = await axios.head(url, { maxRedirects: 5 });
+        const response = await axios.get(url, { maxRedirects: 5 });
         return response.request.res.responseUrl || url;
     } catch (error) {
         console.error(`❌ Erro ao expandir URL: ${url}`, error.message);
@@ -34,18 +31,20 @@ const expandirUrl = async (url) => {
     }
 };
 
-// Função para converter links encurtados do Divulgador Magalu para o Magazine Você
+// Função para converter links da Magalu corretamente
 const converterLinkMagalu = async (url) => {
     const urlExpandida = await expandirUrl(url);
     
-    if (urlExpandida.includes("divulgador.magalu.com")) {
+    if (urlExpandida.includes("produto/") || urlExpandida.includes("p/")) {
         console.log(`🔄 Link Magalu expandido: ${urlExpandida}`);
-        
-        // Pega o código do produto no final do link
-        const codigoProduto = urlExpandida.split("/").pop();
 
-        // Monta a URL completa para o Magazine Você com seu ID correto
-        return `https://www.magazinevoce.com.br/${idAfiliadoMagalu}/p/${codigoProduto}`;
+        // Extraindo a parte final que identifica o produto
+        const partesUrl = urlExpandida.split("/");
+        const codigoProduto = partesUrl.pop(); // Último elemento da URL
+        const categoriaProduto = partesUrl[partesUrl.length - 2]; // Penúltimo elemento
+
+        // Criando URL no formato correto do Magazine Você
+        return `https://www.magazinevoce.com.br/${idAfiliadoMagalu}/p/${categoriaProduto}/${codigoProduto}`;
     }
 
     return urlExpandida;
@@ -104,7 +103,7 @@ bot.on("message", async (ctx) => {
 
     // Verifica se a mensagem foi encaminhada e veio do usuário autorizado
     if (mensagem.forward_date && chatId.toString() === usuarioAutorizado) {
-        await delay(DELAY_ENVIO);
+        await delay(30 * 1000); // Delay de 30 segundos antes de processar a mensagem
 
         if (mensagem.photo) {
             const photo = mensagem.photo[mensagem.photo.length - 1].file_id;
