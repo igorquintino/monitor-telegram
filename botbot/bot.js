@@ -6,41 +6,46 @@ dotenv.config();
 const bot = new Telegraf(process.env.BOT_TOKEN);
 const usuarioAutorizado = process.env.USUARIO_AUTORIZADO;
 const grupoDestino = process.env.GRUPO_DESTINO;
+const linkAfiliadoMercadoLivre = process.env.LINK_AFILIADO_MERCADOLIVRE;
+const linkAfiliadoMagalu = process.env.LINK_AFILIADO_MAGALU;
+const linkAfiliadoAmazon = process.env.LINK_AFILIADO_AMAZON;
 
-// Links de afiliado para cada site
-const LINKS_AFILIADOS = {
-    "mercadolivre.com": "SEU_LINK_AFILIADO_MERCADOLIVRE",
-    "magazineluiza.com": "SEU_LINK_AFILIADO_MAGALU",
-    "amazon.com.br": "SEU_LINK_AFILIADO_AMAZON"
+// Lista de domínios permitidos
+const sitesPermitidos = [
+    "mercadolivre.com",
+    "divulgador.magalu.com",
+    "amzn.to",
+];
+
+// Defina o delay em milissegundos (ajustável)
+const DELAY_ENVIO = 30 * 1000; // Altere esse valor para modificar o tempo (ex: 5 * 60 * 1000 para 5 minutos)
+
+// Função para substituir links pelos links afiliados corretos
+const substituirLinkAfiliado = (texto) => {
+    return texto
+        .replace(/https?:\/\/(www\.)?mercadolivre\.com[^\s]+/g, linkAfiliadoMercadoLivre)
+        .replace(/https?:\/\/(www\.)?divulgador\.magalu\.com[^\s]+/g, linkAfiliadoMagalu)
+        .replace(/https?:\/\/(www\.)?amzn\.to[^\s]+/g, linkAfiliadoAmazon);
 };
 
-// Defina o delay em milissegundos (30 segundos para testes)
-const DELAY_ENVIO = 30 * 1000; // Altere esse valor para mudar o delay
-
-// Função para extrair e substituir links de afiliado
-const substituirLinksAfiliados = (texto) => {
-    let mensagemFormatada = texto;
-    let encontrouLinkPermitido = false;
-
-    mensagemFormatada = mensagemFormatada.replace(/(https?:\/\/[^\s]+)/g, (match) => {
-        try {
-            const url = new URL(match);
-            const dominio = url.hostname.replace("www.", "");
-
-            if (LINKS_AFILIADOS[dominio]) {
-                encontrouLinkPermitido = true;
-                return `🔗 Compre aqui: ${LINKS_AFILIADOS[dominio]}`;
-            }
-        } catch (error) {
-            return "";
-        }
-        return "";
-    });
-
-    return encontrouLinkPermitido ? mensagemFormatada.trim() : null;
+// Função para verificar se a mensagem contém links de sites permitidos
+const contemLinkPermitido = (texto) => {
+    return sitesPermitidos.some(site => texto.includes(site));
 };
 
-// Função para delay
+// Função para formatar a mensagem final
+const formatarMensagem = (texto) => {
+    if (!contemLinkPermitido(texto)) {
+        console.log("🚫 Mensagem ignorada: contém links de sites não permitidos.");
+        return null;
+    }
+
+    // Substitui os links pelos afiliados e retorna a mensagem formatada
+    const textoModificado = substituirLinkAfiliado(texto);
+    return `🔥 Promoção Encontrada! 🔥\n\n${textoModificado}\n\n🔗 Compre aqui: ${textoModificado}`;
+};
+
+// Função de delay
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Escuta mensagens encaminhadas
@@ -50,27 +55,23 @@ bot.on("message", async (ctx) => {
 
     // Verifica se a mensagem foi encaminhada e se veio do usuário autorizado
     if (mensagem.forward_date && chatId.toString() === usuarioAutorizado) {
-        let mensagemTexto = mensagem.text || (mensagem.caption ? mensagem.caption : "");
-
-        // Substitui os links de afiliado e verifica se há links permitidos
-        const mensagemFormatada = substituirLinksAfiliados(mensagemTexto);
-
-        // Se a mensagem não contiver links permitidos, ignora
-        if (!mensagemFormatada) {
-            console.log("🚫 Mensagem ignorada: contém links de sites não permitidos.");
-            return;
-        }
-
         // Aguarda o tempo configurado antes de processar a próxima mensagem
         await delay(DELAY_ENVIO);
 
         if (mensagem.photo) {
             const photo = mensagem.photo[mensagem.photo.length - 1].file_id;
-            await bot.telegram.sendPhoto(grupoDestino, photo, { caption: mensagemFormatada });
-            console.log(`✅ Imagem repassada com legenda: ${mensagemFormatada}`);
-        } else {
-            await bot.telegram.sendMessage(grupoDestino, mensagemFormatada);
-            console.log(`✅ Mensagem repassada: ${mensagemFormatada}`);
+            const legendaFormatada = formatarMensagem(mensagem.caption || "");
+
+            if (legendaFormatada) {
+                await bot.telegram.sendPhoto(grupoDestino, photo, { caption: legendaFormatada });
+                console.log(`✅ Imagem repassada com legenda: ${legendaFormatada}`);
+            }
+        } else if (mensagem.text) {
+            const mensagemFormatada = formatarMensagem(mensagem.text);
+            if (mensagemFormatada) {
+                await bot.telegram.sendMessage(grupoDestino, mensagemFormatada);
+                console.log(`✅ Mensagem repassada: ${mensagemFormatada}`);
+            }
         }
     }
 });
