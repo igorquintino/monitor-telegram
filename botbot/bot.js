@@ -9,7 +9,7 @@ const usuarioAutorizado = process.env.USUARIO_AUTORIZADO;
 const grupoDestino = process.env.GRUPO_DESTINO;
 const idAfiliadoAmazon = process.env.ID_AFILIADO_AMAZON;
 const idAfiliadoMercadoLivre = process.env.ID_AFILIADO_MERCADOLIVRE;
-const idAfiliadoMagalu = process.env.ID_AFILIADO_MAGALU; // Seu ID correto na Magalu
+const idAfiliadoMagalu = process.env.ID_AFILIADO_MAGALU;
 
 // Lista de domínios permitidos
 const sitesPermitidos = [
@@ -20,7 +20,7 @@ const sitesPermitidos = [
     "magazinevoce.com.br"
 ];
 
-// Função para padronizar URLs (garantindo que sempre tenham "https://")
+// Padroniza URLs para garantir que sempre comecem com "https://"
 const padronizarUrl = (url) => {
     if (!url.startsWith("http")) {
         return `https://${url}`;
@@ -28,7 +28,7 @@ const padronizarUrl = (url) => {
     return url;
 };
 
-// Função para expandir URLs encurtadas
+// Expande URLs encurtadas (Magalu, Amazon e outras)
 const expandirUrl = async (url) => {
     try {
         const urlFormatada = padronizarUrl(url);
@@ -40,26 +40,24 @@ const expandirUrl = async (url) => {
     }
 };
 
-// Função para corrigir links da Magalu
+// Converte links da Magalu para incluir o ID correto
 const converterLinkMagalu = async (url) => {
     let urlExpandida = await expandirUrl(url);
-    
-    if (urlExpandida.includes("magazinevoce.com.br")) {
-        console.log(`🔄 Link Magalu expandido: ${urlExpandida}`);
 
-        // Substituindo qualquer ID de afiliado antigo pelo seu ID correto
+    if (urlExpandida.includes("magazinevoce.com.br") || urlExpandida.includes("divulgador.magalu.com")) {
+        console.log(`🔄 Link Magalu expandido: ${urlExpandida}`);
         urlExpandida = urlExpandida.replace(/magazinevoce\.com\.br\/[^/]+\//, `magazinevoce.com.br/${idAfiliadoMagalu}/`);
     }
 
     return urlExpandida;
 };
 
-// Função para verificar se a URL já possui um ID de afiliado
+// Verifica se a URL já possui um ID de afiliado
 const possuiAfiliado = (url) => {
     return url.includes("tag=") || url.includes("afsrc=");
 };
 
-// Função para substituir os links por afiliados
+// Substitui os links pelos afiliados corretos
 const substituirLinkAfiliado = async (texto) => {
     const urlsEncontradas = texto.match(/(?:https?:\/\/)?(?:www\.)?[^\s]+/g) || [];
 
@@ -80,12 +78,12 @@ const substituirLinkAfiliado = async (texto) => {
     return texto;
 };
 
-// Função para verificar se a mensagem contém links de sites permitidos
+// Verifica se a mensagem contém links de sites permitidos
 const contemLinkPermitido = (texto) => {
     return sitesPermitidos.some(site => texto.includes(site));
 };
 
-// Função para formatar a mensagem final
+// Formata a mensagem final
 const formatarMensagem = async (texto) => {
     if (!contemLinkPermitido(texto)) {
         console.log("🚫 Mensagem ignorada: contém links de sites não permitidos.");
@@ -97,7 +95,7 @@ const formatarMensagem = async (texto) => {
     return `🔥 *Promoção Relâmpago!* 🔥\n\n🛍 *Produto:* ${textoModificado}\n\n⚡ Aproveite antes que acabe!`;
 };
 
-// Função de delay
+// Delay para evitar spam
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Escuta mensagens encaminhadas
@@ -105,9 +103,8 @@ bot.on("message", async (ctx) => {
     const chatId = ctx.chat.id;
     const mensagem = ctx.message;
 
-    // Verifica se a mensagem foi encaminhada e veio do usuário autorizado
     if (mensagem.forward_date && chatId.toString() === usuarioAutorizado) {
-        await delay(30 * 1000); // Delay de 30 segundos antes de processar a mensagem
+        await delay(30 * 1000);
 
         if (mensagem.photo) {
             const photo = mensagem.photo[mensagem.photo.length - 1].file_id;
