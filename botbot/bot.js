@@ -10,31 +10,32 @@ const grupoDestino = process.env.GRUPO_DESTINO;
 const idAfiliadoMercadoLivre = process.env.ID_AFILIADO_MERCADOLIVRE;
 const idAfiliadoMagalu = "magazinemulekedaspromos"; // ID fixo para substituição na Magazine
 
-// Lista de domínios permitidos (Mercado Livre permitido, Amazon bloqueado)
+// Sites permitidos e bloqueados
 const sitesPermitidos = ["mercadolivre.com", "divulgador.magalu.com"];
 const sitesNegados = ["amazon.com.br", "amzn.to"];
 
 // Expande URLs encurtadas, se possível
 const expandirUrl = async (url) => {
     if (!url.startsWith("http")) {
-        url = "https://" + url; // Garantir que a URL tenha protocolo
+        url = "https://" + url; // Garante protocolo
     }
 
     try {
         console.log(`🔄 Tentando expandir URL: ${url}`);
         const response = await axios.get(url, {
             maxRedirects: 5,
-            headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" }
+            headers: { "User-Agent": "Mozilla/5.0" }
         });
 
         console.log(`✅ URL expandida: ${url} → ${response.request.res.responseUrl}`);
         return response.request.res.responseUrl || url;
     } catch (error) {
         console.error(`❌ Erro ao expandir URL: ${url} (${error.message})`);
-        return url; // Fallback: usar o link original
+        return url; // Fallback para URL original
     }
 };
 
+// **TRATAMENTO DOS LINKS**
 // Trata links do Mercado Livre
 const tratarLinkMercadoLivre = async (url) => {
     let urlExpandida = await expandirUrl(url);
@@ -62,7 +63,7 @@ const tratarLinkMagalu = async (url) => {
     return urlExpandida;
 };
 
-// Verifica se o texto contém links permitidos e não negados
+// **FILTRAGEM DOS LINKS**
 const contemLinkPermitido = (texto) => {
     return (
         sitesPermitidos.some(site => texto.includes(site) || texto.includes(".br") || texto.includes(".to")) &&
@@ -70,7 +71,7 @@ const contemLinkPermitido = (texto) => {
     );
 };
 
-// Substitui os links por afiliados
+// **SUBSTITUIÇÃO DOS LINKS**
 const substituirLinkAfiliado = async (texto) => {
     const urlsEncontradas = texto.match(/\b(?:https?:\/\/)?(?:www\.)?[\w.-]+\.\w{2,}(?:\/[^\s]*)?/g) || [];
 
@@ -79,13 +80,16 @@ const substituirLinkAfiliado = async (texto) => {
             texto = texto.replace(url, await tratarLinkMercadoLivre(url));
         } else if (url.includes("divulgador.magalu.com")) {
             texto = texto.replace(url, await tratarLinkMagalu(url));
+        } else if (sitesNegados.some(site => url.includes(site))) {
+            console.log(`🚫 Bloqueado: ${url} (Amazon)`);
+            texto = texto.replace(url, "**[LINK BLOQUEADO]**");
         }
     }
 
     return texto;
 };
 
-// Formata a mensagem antes de enviar
+// **FORMATAÇÃO DA MENSAGEM**
 const formatarMensagem = async (texto) => {
     if (!contemLinkPermitido(texto)) {
         console.log("🚫 Mensagem ignorada: contém links não permitidos.");
@@ -96,10 +100,10 @@ const formatarMensagem = async (texto) => {
     return `🔥 *Promoção Relâmpago!* 🔥\n\n${textoModificado}\n\n⚡ Promoção disponibilizada pelo *Muleke das Promos*! Aproveite antes que acabe!`;
 };
 
-// Delay entre mensagens para evitar spam
+// **DELAY PARA EVITAR SPAM**
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Escuta mensagens encaminhadas
+// **ESCUTA AS MENSAGENS**
 bot.on("message", async (ctx) => {
     const chatId = ctx.chat.id;
     const mensagem = ctx.message;
@@ -125,11 +129,11 @@ bot.on("message", async (ctx) => {
     }
 });
 
-// Inicia o bot
+// **INICIA O BOT**
 bot.launch().then(() => {
     console.log("🤖 Bot do Telegram iniciado!");
 });
 
-// Tratamento de erros
+// **TRATAMENTO DE ERROS**
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
