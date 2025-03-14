@@ -7,11 +7,12 @@ dotenv.config();
 const bot = new Telegraf(process.env.BOT_TOKEN);
 const usuarioAutorizado = process.env.USUARIO_AUTORIZADO;
 const grupoDestino = process.env.GRUPO_DESTINO;
-const idAfiliadoAmazon = process.env.ID_AFILIADO_AMAZON;
+const idAfiliadoMercadoLivre = process.env.ID_AFILIADO_MERCADOLIVRE;
 const idAfiliadoMagalu = "magazinemulekedaspromos"; // ID fixo para substituição na Magazine
 
-// Lista de domínios permitidos
-const sitesPermitidos = ["divulgador.magalu.com", "amazon.com.br", "amzn.to"];
+// Lista de domínios permitidos (Mercado Livre permitido, Amazon bloqueado)
+const sitesPermitidos = ["mercadolivre.com", "divulgador.magalu.com"];
+const sitesNegados = ["amazon.com.br", "amzn.to"];
 
 // Expande URLs encurtadas, se possível
 const expandirUrl = async (url) => {
@@ -34,13 +35,16 @@ const expandirUrl = async (url) => {
     }
 };
 
-// Trata links da Amazon
-const tratarLinkAmazon = async (url) => {
-    let urlExpandida = url.includes("amzn.to") ? await expandirUrl(url) : url;
+// Trata links do Mercado Livre
+const tratarLinkMercadoLivre = async (url) => {
+    let urlExpandida = await expandirUrl(url);
 
-    if (urlExpandida.includes("amazon.com.br") && !urlExpandida.includes("?tag=")) {
-        urlExpandida += `?tag=${idAfiliadoAmazon}`;
-        console.log(`🔄 Adicionando ID de afiliado Amazon: ${urlExpandida}`);
+    if (urlExpandida.includes("mercadolivre.com")) {
+        urlExpandida = urlExpandida.replace(
+            /\/social\/[^?]+/,
+            `/social/${idAfiliadoMercadoLivre}`
+        );
+        console.log(`🔄 Adicionando ID de afiliado Mercado Livre: ${urlExpandida}`);
     }
 
     return urlExpandida;
@@ -58,9 +62,12 @@ const tratarLinkMagalu = async (url) => {
     return urlExpandida;
 };
 
-// Verifica se o texto contém links válidos
+// Verifica se o texto contém links permitidos e não negados
 const contemLinkPermitido = (texto) => {
-    return sitesPermitidos.some(site => texto.includes(site) || texto.includes(".br") || texto.includes(".to"));
+    return (
+        sitesPermitidos.some(site => texto.includes(site) || texto.includes(".br") || texto.includes(".to")) &&
+        !sitesNegados.some(site => texto.includes(site))
+    );
 };
 
 // Substitui os links por afiliados
@@ -68,8 +75,8 @@ const substituirLinkAfiliado = async (texto) => {
     const urlsEncontradas = texto.match(/\b(?:https?:\/\/)?(?:www\.)?[\w.-]+\.\w{2,}(?:\/[^\s]*)?/g) || [];
 
     for (let url of urlsEncontradas) {
-        if (url.includes("amazon.com.br") || url.includes("amzn.to")) {
-            texto = texto.replace(url, await tratarLinkAmazon(url));
+        if (url.includes("mercadolivre.com")) {
+            texto = texto.replace(url, await tratarLinkMercadoLivre(url));
         } else if (url.includes("divulgador.magalu.com")) {
             texto = texto.replace(url, await tratarLinkMagalu(url));
         }
