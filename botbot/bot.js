@@ -8,22 +8,30 @@ const bot = new Telegraf(process.env.BOT_TOKEN);
 const usuarioAutorizado = process.env.USUARIO_AUTORIZADO;
 const grupoDestino = process.env.GRUPO_DESTINO;
 const idAfiliadoAmazon = process.env.ID_AFILIADO_AMAZON;
+const idAfiliadoMagalu = "magazinemulekedaspromos"; // ID da Magazine Luiza
 
 // Lista de domínios permitidos
-const sitesPermitidos = ["divulgador.magalu.com", "amazon.com.br", "amzn.to"];
+const sitesPermitidos = [
+    "divulgador.magalu.com",
+    "amazon.com.br",
+    "amzn.to"
+];
 
-// **Expande URLs encurtadas**
+// Função para expandir URLs encurtadas
 const expandirUrl = async (url) => {
     try {
+        console.log(`🔄 Expandindo URL: ${url}`); // Log antes da expansão
         const response = await axios.head(url, { maxRedirects: 5 });
-        return response.request.res.responseUrl || url;
+        const expandedUrl = response.request.res.responseUrl || url;
+        console.log(`✅ URL expandida: ${expandedUrl}`); // Log após a expansão
+        return expandedUrl;
     } catch (error) {
         console.error(`❌ Erro ao expandir URL: ${url}`, error.message);
         return url;
     }
 };
 
-// **Tratamento específico para Amazon**
+// Função para tratar links da Amazon e adicionar ID de afiliado
 const tratarLinkAmazon = async (url) => {
     let urlTratada = url;
 
@@ -40,59 +48,68 @@ const tratarLinkAmazon = async (url) => {
     return urlTratada;
 };
 
-// **Tratamento específico para Magazine Luiza**
+// Função para tratar links da Magazine Luiza
 const tratarLinkMagalu = async (url) => {
-    let urlExpandida = await expandirUrl(url);
+    let urlTratada = await expandirUrl(url);
 
-    // Substituir o identificador do divulgador
-    if (urlExpandida.includes("magazinevoce.com.br")) {
-        urlExpandida = urlExpandida.replace(/\/[a-zA-Z0-9_-]+\//, "/magazinemulekedaspromos/");
+    // Se a URL for da Magazine, substituímos o identificador do afiliado
+    if (urlTratada.includes("magazinevoce.com.br")) {
+        urlTratada = urlTratada.replace(/magazinevoce\.com\.br\/[^/]+/, `magazinevoce.com.br/${idAfiliadoMagalu}`);
     }
 
-    return urlExpandida;
+    return urlTratada;
 };
 
-// **Processa os links encontrados na mensagem**
+// Função para substituir os links por afiliados corretos
 const substituirLinkAfiliado = async (texto) => {
-    const urlsEncontradas = texto.match(/\b(?:https?:\/\/)?(?:www\.)?[\w.-]+\.\w{2,}(?:\/[^\s]*)?/g) || [];
+    const urlsEncontradas = texto.match(/\b(?:https?:\/\/)?(?:www\.)?[\w.-]+\.(?:br|to)(?:\/[^\s]*)?/g) || [];
 
     for (let url of urlsEncontradas) {
-        if (url.includes("amazon.com.br") || url.includes("amzn.to")) {
-            const urlAmazon = await tratarLinkAmazon(url);
-            texto = texto.replace(url, urlAmazon);
-        } else if (url.includes("divulgador.magalu.com")) {
-            const urlMagalu = await tratarLinkMagalu(url);
-            texto = texto.replace(url, urlMagalu);
+        let urlOriginal = url;
+        let urlExpandida = await expandirUrl(url);
+
+        if (urlExpandida.includes("amazon.com.br") || urlExpandida.includes("amzn.to")) {
+            const urlAmazon = await tratarLinkAmazon(urlExpandida);
+            console.log(`🔄 Substituindo Amazon: ${urlOriginal} → ${urlAmazon}`);
+            texto = texto.replace(urlOriginal, urlAmazon);
+        } else if (urlExpandida.includes("divulgador.magalu.com")) {
+            const urlMagalu = await tratarLinkMagalu(urlExpandida);
+            console.log(`🔄 Substituindo Magalu: ${urlOriginal} → ${urlMagalu}`);
+            texto = texto.replace(urlOriginal, urlMagalu);
         }
     }
 
     return texto;
 };
 
-// **Verifica se a mensagem contém links válidos**
+// Função para verificar se há links de sites permitidos
 const contemLinkPermitido = (texto) => {
-    return sitesPermitidos.some(site => texto.includes(site));
+    const temLink = sitesPermitidos.some(site => texto.includes(site));
+    console.log(`🔍 Verificando links na mensagem... Encontrou? ${temLink ? "✅ SIM" : "❌ NÃO"}`);
+    return temLink;
 };
 
-// **Formatação final da mensagem**
+// Função para formatar a mensagem antes de enviá-la
 const formatarMensagem = async (texto) => {
     if (!contemLinkPermitido(texto)) {
         console.log("🚫 Mensagem ignorada: contém links de sites não permitidos.");
         return null;
     }
 
+    // Substituir links pelos links afiliados corretos
     const textoModificado = await substituirLinkAfiliado(texto);
-    return `🔥 *Promoção Relâmpago!* 🔥\n\n${textoModificado}\n\n⚡ Promoção disponibilizada pelo *Muleke das Promos*! Aproveite antes que acabe!`;
+    return `🔥 Promoção Relâmpago! 🔥\n\n${textoModificado}\n\n⚡ Promoção disponibilizada pelo *Muleke das Promos*! Aproveite antes que acabe!`;
 };
 
-// **Delay para evitar bloqueios**
+// Função de delay
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// **Escuta mensagens encaminhadas**
+// Escuta mensagens encaminhadas
 bot.on("message", async (ctx) => {
     const chatId = ctx.chat.id;
     const mensagem = ctx.message;
 
+    // Verifica se a mensagem foi encaminhada e veio do usuário autorizado
     if (mensagem.forward_date && chatId.toString() === usuarioAutorizado) {
         await delay(30000); // 30 segundos
 
@@ -114,11 +131,11 @@ bot.on("message", async (ctx) => {
     }
 });
 
-// **Inicia o bot**
+// Inicia o bot
 bot.launch().then(() => {
     console.log("🤖 Bot do Telegram iniciado!");
 });
 
-// **Tratamento de erros**
+// Tratamento de erros
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
