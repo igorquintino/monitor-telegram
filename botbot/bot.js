@@ -1,6 +1,6 @@
 import { Telegraf } from "telegraf";
 import dotenv from "dotenv";
-import axios from "axios"; // Importamos axios para expandir URLs
+import axios from "axios";
 
 dotenv.config();
 
@@ -8,9 +8,9 @@ const bot = new Telegraf(process.env.BOT_TOKEN);
 const usuarioAutorizado = process.env.USUARIO_AUTORIZADO;
 const grupoDestino = process.env.GRUPO_DESTINO;
 const idAfiliadoAmazon = process.env.ID_AFILIADO_AMAZON;
-const idAfiliadoMagalu = "magazinemulekedaspromos"; // ID correto da Magalu
+const idAfiliadoMagalu = process.env.ID_AFILIADO_MAGALU;
 
-// Lista de sites permitidos
+// Lista de domínios permitidos (Apenas Amazon e Magalu)
 const sitesPermitidos = [
     "divulgador.magalu.com",
     "magazinevoce.com.br",
@@ -18,13 +18,13 @@ const sitesPermitidos = [
     "amzn.to"
 ];
 
-// **1️⃣ Expressão regular para identificar links**
+// Critérios para identificar links
 const regexLink = /\b(?:https?:\/\/)?(?:www\.)?[\w.-]+\.(?:com|br|to)(?:\/[^\s]*)?/gi;
 
-// **2️⃣ Expansão de URLs encurtadas**
+// Expansão de URLs (Amazon e Magalu)
 const expandirUrl = async (url) => {
     try {
-        const response = await axios.head(url, { maxRedirects: 5 });
+        const response = await axios.get(url, { maxRedirects: 5 });
         return response.request.res.responseUrl || url;
     } catch (error) {
         console.error(`❌ Erro ao expandir URL: ${url}`, error.message);
@@ -32,28 +32,33 @@ const expandirUrl = async (url) => {
     }
 };
 
-// **3️⃣ Tratamento de links da Amazon**
+// Tratamento dos links da Amazon
 const tratarLinkAmazon = async (url) => {
     let urlTratada = url;
+
     if (url.includes("amzn.to")) {
         urlTratada = await expandirUrl(url);
     }
+
     if (urlTratada.includes("amazon.com.br") && !urlTratada.includes("?tag=")) {
         urlTratada += `?tag=${idAfiliadoAmazon}`;
     }
+
     return urlTratada;
 };
 
-// **4️⃣ Tratamento de links da Magalu**
+// Tratamento dos links da Magazine Luiza
 const tratarLinkMagalu = async (url) => {
-    let urlExpandida = await expandirUrl(url);
-    if (urlExpandida.includes("magazinevoce.com.br")) {
-        urlExpandida = urlExpandida.replace(/\/[\w-]+\/([^\/]+\/p\/)/, `/${idAfiliadoMagalu}/$1`);
+    let urlTratada = await expandirUrl(url);
+
+    if (urlTratada.includes("magazinevoce.com.br")) {
+        urlTratada = urlTratada.replace(/magazinevoce\.com\.br\/[^\/]+/, `magazinevoce.com.br/${idAfiliadoMagalu}`);
     }
-    return urlExpandida;
+
+    return urlTratada;
 };
 
-// **5️⃣ Substituir links por afiliados corretos**
+// Função para substituir os links na mensagem
 const substituirLinkAfiliado = async (texto) => {
     let urlsEncontradas = texto.match(regexLink) || [];
 
@@ -72,25 +77,26 @@ const substituirLinkAfiliado = async (texto) => {
     return texto;
 };
 
-// **6️⃣ Verificar se a mensagem contém links permitidos**
+// Verificação se a mensagem contém links permitidos
 const contemLinkPermitido = (texto) => {
     return sitesPermitidos.some(site => texto.includes(site));
 };
 
-// **7️⃣ Formatar mensagem final**
+// Formatação da mensagem
 const formatarMensagem = async (texto) => {
     if (!contemLinkPermitido(texto)) {
         console.log("🚫 Mensagem ignorada: contém links de sites não permitidos.");
         return null;
     }
+
     const textoModificado = await substituirLinkAfiliado(texto);
-    return `🔥 Promoção Relâmpago! 🔥\n\n${textoModificado}\n\n⚡ Promoção disponibilizada pelo *Muleke das Promos*! Aproveite antes que acabe!`;
+    return `🔥 *Promoção Relâmpago!* 🔥\n\n🛒 *Produto:* ${textoModificado}\n\n⚡ *Aproveite antes que acabe!*\n\n📢 *Promoção disponibilizada pelo Muleke das Promos!*`;
 };
 
-// **8️⃣ Função de delay**
+// Delay para evitar spam
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// **9️⃣ Escutar mensagens encaminhadas**
+// Processamento das mensagens
 bot.on("message", async (ctx) => {
     const chatId = ctx.chat.id;
     const mensagem = ctx.message;
@@ -103,24 +109,23 @@ bot.on("message", async (ctx) => {
             const legendaFormatada = await formatarMensagem(mensagem.caption || "");
 
             if (legendaFormatada) {
-                await bot.telegram.sendPhoto(grupoDestino, photo, { caption: legendaFormatada });
+                await bot.telegram.sendPhoto(grupoDestino, photo, { caption: legendaFormatada, parse_mode: "Markdown" });
                 console.log(`✅ Imagem repassada com legenda: ${legendaFormatada}`);
             }
         } else if (mensagem.text) {
             const mensagemFormatada = await formatarMensagem(mensagem.text);
             if (mensagemFormatada) {
-                await bot.telegram.sendMessage(grupoDestino, mensagemFormatada);
+                await bot.telegram.sendMessage(grupoDestino, mensagemFormatada, { parse_mode: "Markdown" });
                 console.log(`✅ Mensagem repassada: ${mensagemFormatada}`);
             }
         }
     }
 });
 
-// **🔟 Inicia o bot**
+// Inicialização e Tratamento de Erros
 bot.launch().then(() => {
     console.log("🤖 Bot do Telegram iniciado!");
 });
 
-// **🛠️ Tratamento de erros**
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
